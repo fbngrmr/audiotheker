@@ -134,7 +134,7 @@ func run(url string, targetDirectory string) {
 		downloadErr := downloadFile(url, targetDirectory)
 
 		if downloadErr != nil {
-			fmt.Printf("Downloading URL %s failed with error: %v", url, downloadErr)
+			fmt.Printf("Downloading URL %s failed with error: %v\n", url, downloadErr)
 		}
 	}
 }
