@@ -1,0 +1,7 @@
+audiotheker
+LICENSE
+README.md
+Dockerfile
+Makefile
+.gitignore
+.dockerignore
