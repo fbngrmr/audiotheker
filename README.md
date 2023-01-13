@@ -22,7 +22,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-`audiotheker` allows downloading all episodes of a program in the [ARD Audiothek](https://www.ardaudiothek.de/). It queries the official [GraphQL API](https://api.ardaudiothek.de/docs/#/GraphQL) to gather the download URLs.
+`audiotheker` allows downloading all episodes of a program/collection or an individual episode in the [ARD Audiothek](https://www.ardaudiothek.de/). It queries the official [GraphQL API](https://api.ardaudiothek.de/docs/#/GraphQL) to gather the download URLs.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -77,7 +77,10 @@
 <!-- USAGE EXAMPLES -->
 ## Usage
 
+Copy the URL to a program, collection, or an individual episode from your browser and provide the URL and a target directory to the binary or a Docker container.
+
 ### Built binary
+
 ```sh
 $ ./audiotheker download \
    "https://www.ardaudiothek.de/sendung/j-r-r-tolkien-der-herr-der-ringe-fantasy-hoerspiel-klassiker/12197351/" \
