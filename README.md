@@ -68,7 +68,7 @@
    ```
 3. Build `Docker` image from `Dockerfile`
    ```sh
-   $ docker build -f Dockerfile.amd64 -t audiotheker:0.1.0 .
+   $ docker build -f Dockerfile.amd64 -t audiotheker:0.2.0 .
    ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
