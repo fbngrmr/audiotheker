@@ -1,7 +1,9 @@
-audiotheker
+build/
 LICENSE
 README.md
-Dockerfile
+CHANGELOG.md
+Dockerfile.*
 Makefile
 .gitignore
 .dockerignore
+.github/

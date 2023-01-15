@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    name: Build and release new version
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Build for macOS, Windows, Linux
+        run: make release-darwin && make release-windows && make release-darwin
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        id: create_release
+        with:
+          draft: false
+          prerelease: false
+          release_name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          body: HERE BE COOL CHANGELOG
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Add Linux build to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/audiotheker.linux-amd64.tar.gz
+          asset_name: audiotheker.linux-amd64.tar.gz
+          asset_content_type: application/gzip
+      - name: Add macOS build to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/audiotheker.darwin-amd64.tar.gz
+          asset_name: audiotheker.darwin-amd64.tar.gz
+          asset_content_type: application/gzip
+      - name: Add Windows build to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/audiotheker.windows-amd64.zip
+          asset_name: audiotheker.windows-amd64.zip
+          asset_content_type: application/zip
