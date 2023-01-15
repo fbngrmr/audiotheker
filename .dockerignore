@@ -5,3 +5,4 @@ CHANGELOG.md
 Makefile
 .gitignore
 .dockerignore
+.github/
