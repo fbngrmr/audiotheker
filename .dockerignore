@@ -1,7 +1,7 @@
 build/
 LICENSE
 README.md
-Dockerfile
+CHANGELOG.md
 Makefile
 .gitignore
 .dockerignore
