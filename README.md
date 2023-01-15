@@ -93,7 +93,7 @@ $ docker run \
    --rm \
    --user $(id -u):$(id -g) \
    -v PATH/TO/YOUR/DOWNLOADS:/download \
-   audiotheker:0.1.0 download \
+   audiotheker:0.2.0 download \
    "https://www.ardaudiothek.de/sendung/j-r-r-tolkien-der-herr-der-ringe-fantasy-hoerspiel-klassiker/12197351/" \
    /download
 ```
