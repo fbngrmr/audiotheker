@@ -21,7 +21,7 @@
 go.work
 
 # audiotheker binary
-audiotheker
+build/
 
 # macOS specific files
 .DS_Store

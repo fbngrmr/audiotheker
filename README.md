@@ -82,7 +82,7 @@ Copy the URL to a program, collection, or an individual episode from your browse
 ### Built binary
 
 ```sh
-$ ./audiotheker download \
+$ ./build/audiotheker download \
    "https://www.ardaudiothek.de/sendung/j-r-r-tolkien-der-herr-der-ringe-fantasy-hoerspiel-klassiker/12197351/" \
    PATH/TO/YOUR/DOWNLOADS
 ```
