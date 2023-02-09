@@ -41,9 +41,21 @@ var downloadCmd = &cobra.Command{
 	},
 }
 
-func downloadFile(url string, targetDirectory string) (err error) {
-	fileName := path.Base(url)
-	filePath := filepath.Join(targetDirectory, fileName)
+type File struct {
+	url      string
+	fileName string
+}
+
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 äÄöÖüÜ\-\_]+`)
+
+func toFileName(episodeTitle string, programTitle string) string {
+	value := programTitle + "_-_" + episodeTitle
+	return strings.Replace(nonAlphanumericRegex.ReplaceAllString(strings.Replace(value, "/", "_", -1), ""), " ", "_", -1)
+}
+
+func downloadFile(file File, targetDirectory string) (err error) {
+	fileExtension := filepath.Ext(path.Base(file.url))
+	filePath := filepath.Join(targetDirectory, file.fileName+fileExtension)
 
 	out, createFileErr := os.Create(filePath)
 	if createFileErr != nil {
@@ -51,7 +63,7 @@ func downloadFile(url string, targetDirectory string) (err error) {
 	}
 	defer out.Close()
 
-	httpResponse, httpErr := http.Get(url)
+	httpResponse, httpErr := http.Get(file.url)
 	if httpErr != nil {
 		return httpErr
 	}
@@ -69,18 +81,18 @@ func downloadFile(url string, targetDirectory string) (err error) {
 	return nil
 }
 
-func extractDownloadUrls(response *ItemsResponse) []string {
-	var urls []string
+func extractDownloadUrls(response *ItemsResponse) []File {
+	var files []File
 
 	for _, nodes := range response.Result.Items.Nodes {
 		for _, audios := range nodes.Audios {
 			if audios.DownloadUrl != "" {
-				urls = append(urls, audios.DownloadUrl)
+				files = append(files, File{url: audios.DownloadUrl, fileName: toFileName(audios.Title, nodes.ProgramSet.Title)})
 			}
 		}
 	}
 
-	return urls
+	return files
 }
 
 func extractQueryId(url string) (string, QueryType) {
@@ -117,7 +129,11 @@ type ItemsResponse struct {
 	Result struct {
 		Items struct {
 			Nodes []struct {
+				ProgramSet struct {
+					Title string
+				}
 				Audios []struct {
+					Title       string
 					DownloadUrl string
 				}
 			}
@@ -140,7 +156,7 @@ func sendGraphQlQuery(query string, variables map[string]interface{}, response i
 	return nil
 }
 
-func getProgramUrls(queryId string) ([]string, error) {
+func getProgramUrls(queryId string) ([]File, error) {
 	query := `query ProgramSetEpisodesQuery($id: ID!, $offset: Int!, $count: Int!) {
 		result: programSet(id: $id) {
 			items(
@@ -150,7 +166,11 @@ func getProgramUrls(queryId string) ([]string, error) {
 				filter: { isPublished: { equalTo: true } }
 			) {
 				nodes {
+					programSet {
+						title
+					}
 					audios {
+						title
 						downloadUrl
 					}
 				}
@@ -175,16 +195,18 @@ func getProgramUrls(queryId string) ([]string, error) {
 	return urls, nil
 }
 
-func getCollectionUrls(queryId string) ([]string, error) {
+func getCollectionUrls(queryId string) ([]File, error) {
 	query := `query EpisodesQuery($id: ID!, $offset: Int!, $limit: Int!) {
 		result: editorialCollection(id: $id, offset: $offset, limit: $limit) {
 			items {
 				nodes {
 			  		id
+					programSet {
+						title
+					}
 			  		audios {
-						url
+						title
 						downloadUrl
-						allowDownload
 			  		}
 				}
 		  	}
@@ -203,23 +225,31 @@ func getCollectionUrls(queryId string) ([]string, error) {
 		return nil, graphQlError
 	}
 
-	urls := extractDownloadUrls(&response)
+	files := extractDownloadUrls(&response)
 
-	return urls, nil
+	return files, nil
 }
 
 type ItemResponse struct {
 	Result struct {
+		ProgramSet struct {
+			Title string
+		}
 		Audios []struct {
+			Title       string
 			DownloadUrl *string
 		}
 	}
 }
 
-func getEpisodeUrls(queryId string) ([]string, error) {
+func getEpisodeUrls(queryId string) ([]File, error) {
 	query := `query EpisodeQuery($id: ID!) {
 		result: item(id: $id) {
+			programSet {
+				title
+			}
 		  	audios {
+				title
 				downloadUrl
 		  	}
 		}
@@ -235,19 +265,20 @@ func getEpisodeUrls(queryId string) ([]string, error) {
 		return nil, graphQlError
 	}
 
-	var urls []string
+	var files []File
 	for _, audios := range response.Result.Audios {
 		if audios.DownloadUrl != nil {
 			if *audios.DownloadUrl != "" {
-				urls = append(urls, *audios.DownloadUrl)
+				file := File{url: *audios.DownloadUrl, fileName: toFileName(audios.Title, response.Result.ProgramSet.Title)}
+				files = append(files, file)
 			}
 		}
 	}
 
-	return urls, nil
+	return files, nil
 }
 
-func getDownloadUrls(url string) ([]string, error) {
+func getDownloadUrls(url string) ([]File, error) {
 	queryId, queryType := extractQueryId(url)
 
 	switch queryType {
@@ -266,17 +297,17 @@ func getDownloadUrls(url string) ([]string, error) {
 }
 
 func run(url string, targetDirectory string) {
-	urls, err := getDownloadUrls(url)
+	files, err := getDownloadUrls(url)
 
 	if err != nil {
 		panic(err)
 	}
 
-	for _, url := range urls {
-		downloadErr := downloadFile(url, targetDirectory)
+	for _, file := range files {
+		downloadErr := downloadFile(file, targetDirectory)
 
 		if downloadErr != nil {
-			fmt.Printf("Downloading file %s failed with error: %v\n", url, downloadErr)
+			fmt.Printf("Downloading file %s failed with error: %v\n", file.url, downloadErr)
 		}
 	}
 }
