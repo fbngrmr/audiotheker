@@ -33,8 +33,8 @@ func init() {
 
 var downloadCmd = &cobra.Command{
 	Use:   "download [URL] [targetDirectory]",
-	Short: "Download all episodes of a given program",
-	Long:  "Download all episodes of a given program to the given target directory. Limited to 100 episodes.",
+	Short: "Download all episodes of a program/collection or an individual episode in the ARD Audiothek.",
+	Long:  "Download all episodes of a program/collection or an individual episode in the ARD Audiothek. Limited to 100 episodes.",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		run(args[0], args[1])
