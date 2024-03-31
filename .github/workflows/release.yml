@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Build for macOS, Windows, Linux
-        run: make release-darwin && make release-windows && make release-darwin
+        run: make release-linux && make release-windows && make release-darwin
       - name: Create GitHub release
         uses: actions/create-release@v1
         id: create_release
