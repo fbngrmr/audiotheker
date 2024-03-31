@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var GRAPHQL_ENDPOINT = "https://api.ardaudiothek.de/graphql"
+var graphqlEndPoint = "https://api.ardaudiothek.de/graphql"
 
 type QueryType int64
 
@@ -27,23 +27,21 @@ const (
 	Unknown
 )
 
-func init() {
-	rootCmd.AddCommand(downloadCmd)
+type File struct {
+	url      string
+	fileName string
 }
 
-var downloadCmd = &cobra.Command{
-	Use:   "download [URL] [targetDirectory]",
-	Short: "Download all episodes of a given program",
-	Long:  "Download all episodes of a given program to the given target directory. Limited to 100 episodes.",
-	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		run(args[0], args[1])
-	},
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 äÄöÖüÜ\-\_]+`)
+
+func toFileName(episodeTitle string, programTitle string) string {
+	value := programTitle + "_-_" + episodeTitle
+	return strings.Replace(nonAlphanumericRegex.ReplaceAllString(strings.Replace(value, "/", "_", -1), ""), " ", "_", -1)
 }
 
-func downloadFile(url string, targetDirectory string) (err error) {
-	fileName := path.Base(url)
-	filePath := filepath.Join(targetDirectory, fileName)
+func downloadFile(file File, targetDirectory string) (err error) {
+	fileExtension := filepath.Ext(path.Base(file.url))
+	filePath := filepath.Join(targetDirectory, file.fileName+fileExtension)
 
 	out, createFileErr := os.Create(filePath)
 	if createFileErr != nil {
@@ -51,7 +49,7 @@ func downloadFile(url string, targetDirectory string) (err error) {
 	}
 	defer out.Close()
 
-	httpResponse, httpErr := http.Get(url)
+	httpResponse, httpErr := http.Get(file.url)
 	if httpErr != nil {
 		return httpErr
 	}
@@ -69,18 +67,18 @@ func downloadFile(url string, targetDirectory string) (err error) {
 	return nil
 }
 
-func extractDownloadUrls(response *ItemsResponse) []string {
-	var urls []string
+func extractDownloadUrls(response *ItemsResponse) []File {
+	var files []File
 
 	for _, nodes := range response.Result.Items.Nodes {
 		for _, audios := range nodes.Audios {
 			if audios.DownloadUrl != "" {
-				urls = append(urls, audios.DownloadUrl)
+				files = append(files, File{url: audios.DownloadUrl, fileName: toFileName(audios.Title, nodes.ProgramSet.Title)})
 			}
 		}
 	}
 
-	return urls
+	return files
 }
 
 func extractQueryId(url string) (string, QueryType) {
@@ -117,7 +115,11 @@ type ItemsResponse struct {
 	Result struct {
 		Items struct {
 			Nodes []struct {
+				ProgramSet struct {
+					Title string
+				}
 				Audios []struct {
+					Title       string
 					DownloadUrl string
 				}
 			}
@@ -125,22 +127,7 @@ type ItemsResponse struct {
 	}
 }
 
-func sendGraphQlQuery(query string, variables map[string]interface{}, response interface{}) error {
-	client := graphql.NewClient(GRAPHQL_ENDPOINT, nil)
-
-	rawGraphqlResponse, graphQlErr := client.ExecRaw(context.Background(), query, variables)
-	if graphQlErr != nil {
-		return graphQlErr
-	}
-
-	if jsonError := json.Unmarshal(rawGraphqlResponse, &response); jsonError != nil {
-		return jsonError
-	}
-
-	return nil
-}
-
-func getProgramUrls(queryId string) ([]string, error) {
+func getProgramUrls(queryId string) ([]File, error) {
 	query := `query ProgramSetEpisodesQuery($id: ID!, $offset: Int!, $count: Int!) {
 		result: programSet(id: $id) {
 			items(
@@ -150,7 +137,11 @@ func getProgramUrls(queryId string) ([]string, error) {
 				filter: { isPublished: { equalTo: true } }
 			) {
 				nodes {
+					programSet {
+						title
+					}
 					audios {
+						title
 						downloadUrl
 					}
 				}
@@ -175,16 +166,18 @@ func getProgramUrls(queryId string) ([]string, error) {
 	return urls, nil
 }
 
-func getCollectionUrls(queryId string) ([]string, error) {
+func getCollectionUrls(queryId string) ([]File, error) {
 	query := `query EpisodesQuery($id: ID!, $offset: Int!, $limit: Int!) {
 		result: editorialCollection(id: $id, offset: $offset, limit: $limit) {
 			items {
 				nodes {
 			  		id
+					programSet {
+						title
+					}
 			  		audios {
-						url
+						title
 						downloadUrl
-						allowDownload
 			  		}
 				}
 		  	}
@@ -203,23 +196,31 @@ func getCollectionUrls(queryId string) ([]string, error) {
 		return nil, graphQlError
 	}
 
-	urls := extractDownloadUrls(&response)
+	files := extractDownloadUrls(&response)
 
-	return urls, nil
+	return files, nil
 }
 
-type ItemResponse struct {
-	Result struct {
-		Audios []struct {
-			DownloadUrl *string
+func getEpisodeUrls(queryId string) ([]File, error) {
+	type ItemResponse struct {
+		Result struct {
+			ProgramSet struct {
+				Title string
+			}
+			Audios []struct {
+				Title       string
+				DownloadUrl *string
+			}
 		}
 	}
-}
 
-func getEpisodeUrls(queryId string) ([]string, error) {
 	query := `query EpisodeQuery($id: ID!) {
 		result: item(id: $id) {
+			programSet {
+				title
+			}
 		  	audios {
+				title
 				downloadUrl
 		  	}
 		}
@@ -235,19 +236,35 @@ func getEpisodeUrls(queryId string) ([]string, error) {
 		return nil, graphQlError
 	}
 
-	var urls []string
+	var files []File
 	for _, audios := range response.Result.Audios {
 		if audios.DownloadUrl != nil {
 			if *audios.DownloadUrl != "" {
-				urls = append(urls, *audios.DownloadUrl)
+				file := File{url: *audios.DownloadUrl, fileName: toFileName(audios.Title, response.Result.ProgramSet.Title)}
+				files = append(files, file)
 			}
 		}
 	}
 
-	return urls, nil
+	return files, nil
 }
 
-func getDownloadUrls(url string) ([]string, error) {
+func sendGraphQlQuery(query string, variables map[string]interface{}, response interface{}) error {
+	client := graphql.NewClient(graphqlEndPoint, nil)
+
+	rawGraphqlResponse, graphQlErr := client.ExecRaw(context.Background(), query, variables)
+	if graphQlErr != nil {
+		return graphQlErr
+	}
+
+	if jsonError := json.Unmarshal(rawGraphqlResponse, &response); jsonError != nil {
+		return jsonError
+	}
+
+	return nil
+}
+
+func getDownloadUrls(url string) ([]File, error) {
 	queryId, queryType := extractQueryId(url)
 
 	switch queryType {
@@ -265,18 +282,28 @@ func getDownloadUrls(url string) ([]string, error) {
 	}
 }
 
+var DownloadCmd = &cobra.Command{
+	Use:   "download [URL] [targetDirectory]",
+	Short: "Download all episodes of a program/collection or an individual episode in the ARD Audiothek.",
+	Long:  "Download all episodes of a program/collection or an individual episode in the ARD Audiothek. Limited to 100 episodes.",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		run(args[0], args[1])
+	},
+}
+
 func run(url string, targetDirectory string) {
-	urls, err := getDownloadUrls(url)
+	files, err := getDownloadUrls(url)
 
 	if err != nil {
 		panic(err)
 	}
 
-	for _, url := range urls {
-		downloadErr := downloadFile(url, targetDirectory)
+	for _, file := range files {
+		downloadErr := downloadFile(file, targetDirectory)
 
 		if downloadErr != nil {
-			fmt.Printf("Downloading file %s failed with error: %v\n", url, downloadErr)
+			fmt.Printf("Downloading file %s failed with error: %v\n", file.url, downloadErr)
 		}
 	}
 }

@@ -4,6 +4,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func SetupCli() {
+	rootCmd.AddCommand(DownloadCmd)
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "audiotheker",
 	Short: "`audiotheker allows downloading all episodes of a program in the ARD Audiothek.",
