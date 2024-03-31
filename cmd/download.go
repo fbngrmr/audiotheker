@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var GRAPHQL_ENDPOINT = "https://api.ardaudiothek.de/graphql"
+var graphqlEndPoint = "https://api.ardaudiothek.de/graphql"
 
 type QueryType int64
 
@@ -26,20 +26,6 @@ const (
 	Program
 	Unknown
 )
-
-func init() {
-	rootCmd.AddCommand(downloadCmd)
-}
-
-var downloadCmd = &cobra.Command{
-	Use:   "download [URL] [targetDirectory]",
-	Short: "Download all episodes of a program/collection or an individual episode in the ARD Audiothek.",
-	Long:  "Download all episodes of a program/collection or an individual episode in the ARD Audiothek. Limited to 100 episodes.",
-	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		run(args[0], args[1])
-	},
-}
 
 type File struct {
 	url      string
@@ -141,21 +127,6 @@ type ItemsResponse struct {
 	}
 }
 
-func sendGraphQlQuery(query string, variables map[string]interface{}, response interface{}) error {
-	client := graphql.NewClient(GRAPHQL_ENDPOINT, nil)
-
-	rawGraphqlResponse, graphQlErr := client.ExecRaw(context.Background(), query, variables)
-	if graphQlErr != nil {
-		return graphQlErr
-	}
-
-	if jsonError := json.Unmarshal(rawGraphqlResponse, &response); jsonError != nil {
-		return jsonError
-	}
-
-	return nil
-}
-
 func getProgramUrls(queryId string) ([]File, error) {
 	query := `query ProgramSetEpisodesQuery($id: ID!, $offset: Int!, $count: Int!) {
 		result: programSet(id: $id) {
@@ -230,19 +201,19 @@ func getCollectionUrls(queryId string) ([]File, error) {
 	return files, nil
 }
 
-type ItemResponse struct {
-	Result struct {
-		ProgramSet struct {
-			Title string
-		}
-		Audios []struct {
-			Title       string
-			DownloadUrl *string
+func getEpisodeUrls(queryId string) ([]File, error) {
+	type ItemResponse struct {
+		Result struct {
+			ProgramSet struct {
+				Title string
+			}
+			Audios []struct {
+				Title       string
+				DownloadUrl *string
+			}
 		}
 	}
-}
 
-func getEpisodeUrls(queryId string) ([]File, error) {
 	query := `query EpisodeQuery($id: ID!) {
 		result: item(id: $id) {
 			programSet {
@@ -278,6 +249,21 @@ func getEpisodeUrls(queryId string) ([]File, error) {
 	return files, nil
 }
 
+func sendGraphQlQuery(query string, variables map[string]interface{}, response interface{}) error {
+	client := graphql.NewClient(graphqlEndPoint, nil)
+
+	rawGraphqlResponse, graphQlErr := client.ExecRaw(context.Background(), query, variables)
+	if graphQlErr != nil {
+		return graphQlErr
+	}
+
+	if jsonError := json.Unmarshal(rawGraphqlResponse, &response); jsonError != nil {
+		return jsonError
+	}
+
+	return nil
+}
+
 func getDownloadUrls(url string) ([]File, error) {
 	queryId, queryType := extractQueryId(url)
 
@@ -294,6 +280,16 @@ func getDownloadUrls(url string) ([]File, error) {
 	default:
 		return nil, fmt.Errorf("URL is not supported: %s", url)
 	}
+}
+
+var DownloadCmd = &cobra.Command{
+	Use:   "download [URL] [targetDirectory]",
+	Short: "Download all episodes of a program/collection or an individual episode in the ARD Audiothek.",
+	Long:  "Download all episodes of a program/collection or an individual episode in the ARD Audiothek. Limited to 100 episodes.",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		run(args[0], args[1])
+	},
 }
 
 func run(url string, targetDirectory string) {
