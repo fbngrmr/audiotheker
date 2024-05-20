@@ -74,6 +74,8 @@ func extractDownloadUrls(response *ItemsResponse) []File {
 		for _, audios := range nodes.Audios {
 			if audios.DownloadUrl != "" {
 				files = append(files, File{url: audios.DownloadUrl, fileName: toFileName(audios.Title, nodes.ProgramSet.Title)})
+			} else if audios.Url != "" {
+				files = append(files, File{url: audios.Url, fileName: toFileName(audios.Title, nodes.ProgramSet.Title)})
 			}
 		}
 	}
@@ -119,8 +121,10 @@ type ItemsResponse struct {
 					Title string
 				}
 				Audios []struct {
-					Title       string
-					DownloadUrl string
+					Title         string
+					DownloadUrl   string
+					AllowDownload bool
+					Url           string
 				}
 			}
 		}
@@ -142,7 +146,9 @@ func getProgramUrls(queryId string) ([]File, error) {
 					}
 					audios {
 						title
-						downloadUrl
+						downloadUrl,
+						allowDownload,
+						url
 					}
 				}
 			}
@@ -210,6 +216,7 @@ func getEpisodeUrls(queryId string) ([]File, error) {
 			Audios []struct {
 				Title       string
 				DownloadUrl *string
+				Url         string
 			}
 		}
 	}
@@ -222,7 +229,8 @@ func getEpisodeUrls(queryId string) ([]File, error) {
 		  	audios {
 				title
 				downloadUrl
-		  	}
+				url
+			}
 		}
 	}`
 	variables := map[string]interface{}{
@@ -241,6 +249,9 @@ func getEpisodeUrls(queryId string) ([]File, error) {
 		if audios.DownloadUrl != nil {
 			if *audios.DownloadUrl != "" {
 				file := File{url: *audios.DownloadUrl, fileName: toFileName(audios.Title, response.Result.ProgramSet.Title)}
+				files = append(files, file)
+			} else {
+				file := File{url: *&audios.Url, fileName: toFileName(audios.Title, response.Result.ProgramSet.Title)}
 				files = append(files, file)
 			}
 		}
